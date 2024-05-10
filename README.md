@@ -6,11 +6,12 @@ Edit the config.json file to specify the target application name (processName) a
 Run the program and initiate the injection process.
 <br><br>
 
-`config.json`
+`config.json example`
 
 ```json
 {
-"processName": "TargetApplication.exe",
-"dllPath": "C:/Path/To/YourDLL.dll"
+  "processName": "DEVOUR.exe",
+  "dllPath": "D:/SteamLibrary/steamapps/common/Devour/",
+  "dllName": "DevourX.dll"
 }
 ```
