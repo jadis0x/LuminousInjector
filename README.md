@@ -2,8 +2,8 @@
 A simple DLL injector that injects a DLL into another process using LoadLibrary.
 
 
-Edit the config.json file to specify the target application name (processName) and the path of the DLL to be injected (dllPath).
-Run the program and initiate the injection process.
+Edit the config.json file to specify the target application name (processName).
+Run the program and select the dll to inject using the "open file" popup.
 <br><br>
 
 `config.json example`
@@ -11,7 +11,5 @@ Run the program and initiate the injection process.
 ```json
 {
   "processName": "DEVOUR.exe",
-  "dllPath": "D:/SteamLibrary/steamapps/common/Devour/",
-  "dllName": "DevourX.dll"
 }
 ```
