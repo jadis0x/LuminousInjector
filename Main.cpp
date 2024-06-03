@@ -1,6 +1,7 @@
 ﻿#include <Windows.h>
 #include <iostream>
 #include <TlHelp32.h>
+#include <shobjidl.h>
 
 #include "nlohmann/json.hpp"
 #include <fstream>
@@ -86,6 +87,14 @@ bool InjectDLL(DWORD processId, const char* dllPath) {
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED |
+        COINIT_DISABLE_OLE1DDE);
+
+    if (FAILED(hr)) {
+        MessageBox(NULL, L"CoInitializeEx function failed.", L"Error", MB_OK | MB_ICONERROR);
+        return 1;
+    }
+
     std::ifstream configFile("config.json");
     if (!configFile.is_open()) {
         MessageBox(NULL, L"The config file could not be opened!", L"Error", MB_OK | MB_ICONERROR);
@@ -99,13 +108,47 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     std::wstring processNameWStr(processNameStr.begin(), processNameStr.end());
     const wchar_t* processName = processNameWStr.c_str();
 
-    std::string dllPathStr = configJson["dllPath"];
-    std::string dllName = configJson["dllName"];
-    
-    std::string dllPathWithName = dllPathStr += dllName;
+    IFileOpenDialog* pFileOpen;
+    hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_ALL,
+        IID_IFileOpenDialog, reinterpret_cast<void**>(&pFileOpen));
 
-    std::wstring dllPathWithNameWStr(dllPathStr.begin(), dllPathStr.end());
-    const wchar_t* dllPath = dllPathWithNameWStr.c_str();
+    if (FAILED(hr)) {
+        MessageBox(NULL, L"Failed to open file open dialog box.", L"Error", MB_OK | MB_ICONERROR);
+        return 1;
+    }
+
+    COMDLG_FILTERSPEC rgSpec[] =
+    {
+        { L"Dynamic Link Libraries (*.dll)", L"*.dll" }
+    };
+
+    pFileOpen->SetDefaultExtension(L"dll");
+    pFileOpen->SetTitle(L"Select the .dll file to inject.");
+    pFileOpen->SetFileTypes(ARRAYSIZE(rgSpec), rgSpec);
+    hr = pFileOpen->Show(NULL);
+
+    if (FAILED(hr)) {
+        MessageBox(NULL, L"Failed to open file open dialog box.", L"Error", MB_OK | MB_ICONERROR);
+        return 1;
+    }
+
+    IShellItem* pItem;
+    hr = pFileOpen->GetResult(&pItem);
+
+    if (FAILED(hr)) {
+        MessageBox(NULL, L"Failed to retrieve file name.", L"Error", MB_OK | MB_ICONERROR);
+        return 1;
+    }
+
+    PWSTR pszFilePath;
+    hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
+
+    if (FAILED(hr)) {
+        MessageBox(NULL, L"Failed to retrieve file name.", L"Error", MB_OK | MB_ICONERROR);
+        return 1;
+    }
+
+    const wchar_t* dllPath = pszFilePath;
 
     DWORD targetProcessId = GetProcessIdByName(processName);
     if (targetProcessId == 0) {
@@ -123,13 +166,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
     }
 
-    if (InjectDLL(targetProcessId, dllPathStr.c_str())) {
+    std::wstring tmp(dllPath);
+    std::string dll_path_str(tmp.begin(), tmp.end());
+
+    if (InjectDLL(targetProcessId, dll_path_str.c_str())) {
 
     }
     else {
         MessageBox(NULL, L"Failed to inject DLL into process", L"LuminousInjector", MB_OK | MB_ICONERROR);
+        CoTaskMemFree(pszFilePath);
+        pItem->Release();
+        pFileOpen->Release();
+        CoUninitialize();
         return 1;
     }
 
+	CoTaskMemFree(pszFilePath);
+	pItem->Release();
+	pFileOpen->Release();
+	CoUninitialize();
     return 0;
 }
